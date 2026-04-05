@@ -1,152 +1,305 @@
 import 'package:flutter/material.dart';
 
 class ResultScreen extends StatefulWidget {
-  const ResultScreen({super.key});
+	const ResultScreen({super.key, this.initialText = ''});
 
-  @override
-  State<ResultScreen> createState() => _ResultScreenState();
+	final String initialText;
+
+	@override
+	State<ResultScreen> createState() => _ResultScreenState();
 }
 
 class _ResultScreenState extends State<ResultScreen> {
-  // Exemple de données historique
-  final List<Map<String, String>> results = [
-    {'gesture': 'A', 'text': 'Bonjour', 'time': '14:30'},
-    {'gesture': 'B', 'text': 'Au revoir', 'time': '14:28'},
-    {'gesture': 'C', 'text': 'Merci', 'time': '14:25'},
-    {'gesture': 'D', 'text': 'S\'il vous plaît', 'time': '14:22'},
-  ];
+	late final TextEditingController _controller;
+	String _output = '';
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Résultats'),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            onPressed: () {
-              _showDeleteDialog();
-            },
-          ),
-        ],
-      ),
-      body: results.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.inbox,
-                    size: 64,
-                    color: Colors.grey[300],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Aucun résultat',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              itemCount: results.length,
-              itemBuilder: (context, index) {
-                final result = results[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  child: ListTile(
-                    leading: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          result['gesture']!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      result['text']!,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Text(
-                      result['time']!,
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
-                      ),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.copy),
-                      onPressed: () {
-                        _copyToClipboard(result['text']!);
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-    );
-  }
+	@override
+	void initState() {
+		super.initState();
+		_controller = TextEditingController(text: widget.initialText);
+	}
 
-  void _copyToClipboard(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$text copié !'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
+	@override
+	void dispose() {
+		_controller.dispose();
+		super.dispose();
+	}
 
-  void _showDeleteDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Supprimer l\'historique ?'),
-          content: const Text(
-            'Cette action supprimera tous les résultats. Êtes-vous sûr ?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                // Logique de suppression
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Historique supprimé')),
-                );
-              },
-              child: const Text(
-                'Supprimer',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+	@override
+	Widget build(BuildContext context) {
+		return Scaffold(
+			backgroundColor: const Color(0xFFF2F5FA),
+			body: SafeArea(
+				child: Padding(
+					padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+					child: Column(
+						crossAxisAlignment: CrossAxisAlignment.start,
+						children: [
+							Row(
+								children: [
+									IconButton(
+										onPressed: () => Navigator.pop(context),
+										icon: const Icon(Icons.arrow_back),
+									),
+									const SizedBox(width: 6),
+									const Column(
+										crossAxisAlignment: CrossAxisAlignment.start,
+										children: [
+											Text(
+												'Text to Sign',
+												style: TextStyle(
+													fontSize: 29,
+													fontWeight: FontWeight.w800,
+													color: Color(0xFF212B3D),
+												),
+											),
+											Text(
+												'ASL - American Sign Language',
+												style: TextStyle(
+													color: Color(0xFF98A4B5),
+													fontWeight: FontWeight.w600,
+												),
+											),
+										],
+									),
+									const Spacer(),
+									const Icon(Icons.info_outline, color: Color(0xFF7E8798)),
+								],
+							),
+							const SizedBox(height: 14),
+							Expanded(
+								child: SingleChildScrollView(
+									child: Column(
+										children: [
+											Container(
+												padding: const EdgeInsets.all(14),
+												decoration: BoxDecoration(
+													color: Colors.white,
+													borderRadius: BorderRadius.circular(20),
+													border: Border.all(color: const Color(0xFFE8EDF4)),
+												),
+												child: Column(
+													children: [
+														Row(
+															children: [
+																const Icon(Icons.title, color: Color(0xFFB4BECC)),
+																const SizedBox(width: 10),
+																const Text(
+																	'Enter text to translate',
+																	style: TextStyle(
+																		color: Color(0xFF8C96A8),
+																		fontWeight: FontWeight.w600,
+																	),
+																),
+																const Spacer(),
+																Text(
+																	'${_controller.text.length}/200',
+																	style: const TextStyle(color: Color(0xFFAFB9C8)),
+																),
+															],
+														),
+														const SizedBox(height: 12),
+														TextField(
+															controller: _controller,
+															maxLength: 200,
+															maxLines: 3,
+															decoration: InputDecoration(
+																counterText: '',
+																hintText: 'Type your message here...',
+																hintStyle: const TextStyle(
+																	color: Color(0xFF9CA8B9),
+																	fontWeight: FontWeight.w600,
+																),
+																filled: true,
+																fillColor: const Color(0xFFF6F8FC),
+																border: OutlineInputBorder(
+																	borderRadius: BorderRadius.circular(14),
+																	borderSide: BorderSide.none,
+																),
+															),
+															onChanged: (_) => setState(() {}),
+														),
+														const SizedBox(height: 10),
+														Wrap(
+															spacing: 8,
+															runSpacing: 8,
+															children: [
+																'Hello, nice to meet you',
+																'Thank you very much',
+																'How are you today?',
+															]
+																	.map(
+																		(sample) => ActionChip(
+																			backgroundColor: const Color(0xFFEFF5FF),
+																			labelStyle: const TextStyle(
+																				color: Color(0xFF4A8AFB),
+																				fontWeight: FontWeight.w700,
+																			),
+																			onPressed: () {
+																				setState(() {
+																					_controller.text = sample;
+																				});
+																			},
+																			label: Text(sample),
+																		),
+																	)
+																	.toList(),
+														),
+													],
+												),
+											),
+											const SizedBox(height: 14),
+											Row(
+												children: [
+													Expanded(
+														child: Container(
+															padding: const EdgeInsets.all(14),
+															decoration: BoxDecoration(
+																color: Colors.white,
+																borderRadius: BorderRadius.circular(16),
+																border: Border.all(color: const Color(0xFFE8EDF4)),
+															),
+															child: const Row(
+																children: [
+																	Icon(Icons.g_translate,
+																			color: Color(0xFF667085)),
+																	SizedBox(width: 10),
+																	Text(
+																		'English',
+																		style: TextStyle(
+																			fontWeight: FontWeight.w700,
+																			color: Color(0xFF344054),
+																		),
+																	),
+																],
+															),
+														),
+													),
+													const SizedBox(width: 10),
+													Container(
+														width: 48,
+														height: 48,
+														decoration: const BoxDecoration(
+															shape: BoxShape.circle,
+															color: Color(0xFF3A82F7),
+														),
+														child: const Icon(Icons.arrow_forward,
+																color: Colors.white),
+													),
+													const SizedBox(width: 10),
+													Expanded(
+														child: Container(
+															padding: const EdgeInsets.all(14),
+															decoration: BoxDecoration(
+																color: Colors.white,
+																borderRadius: BorderRadius.circular(16),
+																border: Border.all(color: const Color(0xFFE8EDF4)),
+															),
+															child: const Row(
+																children: [
+																	Icon(Icons.sign_language,
+																			color: Color(0xFF34C38F)),
+																	SizedBox(width: 10),
+																	Text(
+																		'ASL',
+																		style: TextStyle(
+																			fontWeight: FontWeight.w700,
+																			color: Color(0xFF344054),
+																		),
+																	),
+																],
+															),
+														),
+													),
+												],
+											),
+											const SizedBox(height: 14),
+											SizedBox(
+												width: double.infinity,
+												child: ElevatedButton.icon(
+													style: ElevatedButton.styleFrom(
+														elevation: 0,
+														backgroundColor: _controller.text.trim().isEmpty
+																? const Color(0xFFC7CCD6)
+																: const Color(0xFF3A82F7),
+														foregroundColor: Colors.white,
+														padding: const EdgeInsets.symmetric(vertical: 15),
+														shape: RoundedRectangleBorder(
+															borderRadius: BorderRadius.circular(14),
+														),
+													),
+													onPressed: _controller.text.trim().isEmpty
+															? null
+															: () {
+																	setState(() {
+																		_output =
+																				'Sign animation generated for: "${_controller.text}"';
+																	});
+																},
+													icon: const Icon(Icons.bolt_rounded),
+													label: const Text(
+														'Translate to Sign',
+														style: TextStyle(fontWeight: FontWeight.w800),
+													),
+												),
+											),
+											const SizedBox(height: 14),
+											Container(
+												width: double.infinity,
+												padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+												decoration: BoxDecoration(
+													color: const Color(0xFFEAF9F2),
+													borderRadius: BorderRadius.circular(16),
+													border: Border.all(color: const Color(0xFFC8EDD9)),
+												),
+												child: Column(
+													crossAxisAlignment: CrossAxisAlignment.start,
+													children: [
+														const Row(
+															children: [
+																Icon(Icons.ondemand_video,
+																		color: Color(0xFF2EAF7D), size: 18),
+																SizedBox(width: 8),
+																Text(
+																	'Sign Language Output',
+																	style: TextStyle(
+																		color: Color(0xFF2EAF7D),
+																		fontWeight: FontWeight.w800,
+																	),
+																),
+															],
+														),
+														const SizedBox(height: 10),
+														Container(
+															width: double.infinity,
+															constraints: const BoxConstraints(minHeight: 88),
+															decoration: BoxDecoration(
+																borderRadius: BorderRadius.circular(12),
+																color: Colors.white,
+															),
+															padding: const EdgeInsets.all(12),
+															child: Text(
+																_output.isEmpty
+																		? 'Your generated sign output will appear here.'
+																		: _output,
+																style: TextStyle(
+																	color: _output.isEmpty
+																			? const Color(0xFF8B98A8)
+																			: const Color(0xFF2B3648),
+																),
+															),
+														),
+													],
+												),
+											),
+										],
+									),
+								),
+							),
+						],
+					),
+				),
+			),
+		);
+	}
 }
