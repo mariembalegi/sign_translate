@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../services/sign_language_service.dart';
+import '../services/storage_service.dart';
 
 class ResultScreen extends StatefulWidget {
   const ResultScreen({super.key, this.initialText = ''});
@@ -13,10 +14,13 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen> {
   late final TextEditingController _controller;
   final _service = SignLanguageService();
+  final _storage = StorageService();
 
   bool _loading = false;
   String? _errorMessage;
   VideoPlayerController? _videoController;
+  int _playingIndex = 0;
+  List<String> _playlist = const [];
 
   @override
   void initState() {
@@ -31,6 +35,105 @@ class _ResultScreenState extends State<ResultScreen> {
     super.dispose();
   }
 
+  Future<void> _openServerSettings() async {
+    final current = _storage.getServerUrl();
+    final ctrl = TextEditingController(text: current.isEmpty ? _service.baseUrl : current);
+
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Serveur API'),
+          content: TextField(
+            controller: ctrl,
+            decoration: const InputDecoration(
+              hintText: 'Ex: http://10.0.2.2:8000',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (saved == null) return;
+    await _storage.setServerUrl(saved);
+    if (!mounted) return;
+    setState(() {
+      _errorMessage = null;
+    });
+  }
+
+  Future<void> _playPlaylist(List<String> sources) async {
+    _videoController?.dispose();
+    _videoController = null;
+    _playlist = sources;
+    _playingIndex = 0;
+
+    if (sources.isEmpty) {
+      throw Exception('Aucun mot détecté dans le texte.');
+    }
+
+    await _startSource(sources.first);
+  }
+
+  Future<void> _startSource(String source) async {
+    final controller = source.startsWith('asset://')
+        ? VideoPlayerController.asset(source.replaceFirst('asset://', ''))
+        : VideoPlayerController.networkUrl(Uri.parse(source));
+    await controller.initialize();
+    controller.setLooping(false);
+    controller.play();
+
+    void listener() {
+      final v = controller.value;
+      if (!v.isInitialized) return;
+      final ended = v.duration.inMilliseconds > 0 &&
+          v.position.inMilliseconds >= v.duration.inMilliseconds - 120;
+      if (!ended) return;
+
+      controller.removeListener(listener);
+      controller.pause();
+      _goNext();
+    }
+
+    controller.addListener(listener);
+
+    if (!mounted) {
+      controller.dispose();
+      return;
+    }
+    setState(() => _videoController = controller);
+  }
+
+  Future<void> _goNext() async {
+    if (!mounted) return;
+    final nextIndex = _playingIndex + 1;
+    if (nextIndex >= _playlist.length) {
+      // Fin: on boucle sur la dernière vidéo (plus agréable pour l’utilisateur)
+      final ctrl = _videoController;
+      if (ctrl != null) {
+        ctrl.setLooping(true);
+        ctrl.play();
+      }
+      return;
+    }
+
+    setState(() => _playingIndex = nextIndex);
+    final nextSource = _playlist[nextIndex];
+    _videoController?.dispose();
+    _videoController = null;
+    await _startSource(nextSource);
+  }
+
   Future<void> _translate() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -39,19 +142,14 @@ class _ResultScreenState extends State<ResultScreen> {
       _errorMessage = null;
       _videoController?.dispose();
       _videoController = null;
+      _playlist = const [];
+      _playingIndex = 0;
     });
     try {
-      final videoUrl = await _service.textToSign(text);
-      final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
-      await controller.initialize();
-      controller.setLooping(true);
-      controller.play();
-      if (mounted) {
-        setState(() {
-          _videoController = controller;
-          _loading = false;
-        });
-      }
+      final urls = await _service.textToSignSequence(text);
+      await _playPlaylist(urls);
+      if (!mounted) return;
+      setState(() => _loading = false);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -85,6 +183,11 @@ class _ResultScreenState extends State<ResultScreen> {
                     ),
                   ),
                   const Spacer(),
+                  IconButton(
+                    tooltip: 'Serveur',
+                    onPressed: _openServerSettings,
+                    icon: const Icon(Icons.settings, color: Color(0xFFB4BECC)),
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -123,6 +226,12 @@ class _ResultScreenState extends State<ResultScreen> {
                             const SizedBox(height: 12),
                             TextField(
                               controller: _controller,
+                              cursorColor: Colors.white,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
                               maxLength: 200,
                               maxLines: 3,
                               decoration: InputDecoration(
@@ -133,7 +242,7 @@ class _ResultScreenState extends State<ResultScreen> {
                                   fontWeight: FontWeight.w600,
                                 ),
                                 filled: true,
-                                  fillColor: const Color(0xFF132137),
+                                fillColor: const Color(0xFF132137),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
                                   borderSide: BorderSide.none,
@@ -226,6 +335,24 @@ class _ResultScreenState extends State<ResultScreen> {
                                 _videoController!.value.isInitialized)
                               Column(
                                 children: [
+                                  if (_playlist.length > 1)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.queue_play_next,
+                                              color: Color(0xFF8DA3C6), size: 16),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Mot ${_playingIndex + 1}/${_playlist.length}',
+                                            style: const TextStyle(
+                                              color: Color(0xFF8DA3C6),
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
                                     child: AspectRatio(

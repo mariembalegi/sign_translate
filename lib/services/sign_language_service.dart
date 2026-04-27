@@ -2,11 +2,30 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io' show Platform;
+
+import 'storage_service.dart';
 
 class SignLanguageService {
-  // Android emulator  → 10.0.2.2
-  // Physical device   → your computer's LAN IP
-  static const String baseUrl = 'http://192.168.1.149:8000';
+  static const Map<String, String> _localWordVideos = {
+    '3aslema': 'videos/3aslema.mp4',
+    'barnamjek': 'videos/barnamjek.mp4',
+    'bou': 'videos/bou.mp4',
+  };
+
+  static String _defaultBaseUrl() {
+    // Android emulator  → 10.0.2.2
+    // iOS simulator     → localhost
+    // Physical device   → your computer's LAN IP (configurable in app storage)
+    if (Platform.isAndroid) return 'http://10.0.2.2:8000';
+    return 'http://localhost:8000';
+  }
+
+  String get baseUrl {
+    final stored = StorageService().getServerUrl().trim();
+    if (stored.isNotEmpty) return stored;
+    return _defaultBaseUrl();
+  }
 
   static final SignLanguageService _instance = SignLanguageService._internal();
 
@@ -56,20 +75,52 @@ class SignLanguageService {
   }
 
   // ── Text → Sign video ────────────────────────
-  /// Returns the network URL for the sign video.
-  /// Call this with VideoPlayerController.networkUrl().
-  Future<String> textToSign(String text) async {
-    // Validate the word exists first (lightweight check)
-    final uri = Uri.parse('$baseUrl/text_to_sign').replace(
+  Uri _textToSignUri(String text) {
+    return Uri.parse('$baseUrl/text_to_sign').replace(
       queryParameters: {'text': text},
     );
-    final response = await http.head(uri).timeout(const Duration(seconds: 10));
-    if (response.statusCode == 200 || response.statusCode == 405) {
-      // Return the GET URL directly for VideoPlayerController.networkUrl()
+  }
+
+  /// Retourne l'URL (GET) que `video_player` va streamer.
+  /// On évite `HEAD` car beaucoup de serveurs ne le supportent pas.
+  Future<String> textToSign(String text) async {
+    final uri = _textToSignUri(text);
+    // Pré-check léger via GET avec Range pour éviter de télécharger toute la vidéo.
+    final response = await http.get(
+      uri,
+      headers: const {'Range': 'bytes=0-1'},
+    ).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200 || response.statusCode == 206) {
       return uri.toString();
     }
-    final detail = 'text_to_sign failed (${response.statusCode})';
-    throw Exception(detail);
+    throw Exception('Impossible de générer la vidéo (HTTP ${response.statusCode}). Vérifie l’URL du serveur.');
+  }
+
+  /// Split simple du texte en tokens (mots), utile si le backend ne gère
+  /// qu’un seul mot par requête.
+  List<String> tokenizeText(String text) {
+    final cleaned = text
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r"[^\p{L}\p{N}\s']+", unicode: true), ' ');
+    return cleaned.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+  }
+
+  Future<List<String>> textToSignSequence(String text) async {
+    final tokens = tokenizeText(text);
+    if (tokens.isEmpty) return [];
+
+    final urls = <String>[];
+    for (final token in tokens) {
+      final localPath = _localWordVideos[token];
+      if (localPath != null) {
+        urls.add('asset://$localPath');
+        continue;
+      }
+      urls.add(await textToSign(token));
+    }
+    return urls;
   }
 
   // ── Available sign classes ───────────────────
